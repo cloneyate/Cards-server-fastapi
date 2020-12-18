@@ -266,4 +266,8 @@ async def edit_a_card_only_creator(card: Card, current_user: User = Depends(get_
 
 @app.get("/cards/{cid}", response_model=Card)
 async def get_cards(cid: str):
-    return Card(**cards_coll.find_one({"_id": ObjectId(cid)}))
+    output = cards_coll.find_one({"_id": ObjectId(cid)})
+    if output:
+        return Card(**output)
+    else:
+        raise HTTPException(status_code=404)
