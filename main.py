@@ -1,7 +1,7 @@
 from bson import ObjectId
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import Depends, FastAPI, HTTPException, status, Path
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -57,7 +57,6 @@ class User(BaseModel):
     avatar_url: Optional[str] = None
     nickname: Optional[str] = None
     disabled: Optional[bool] = None
-    cards: Optional[list] = []
 
     class Config:
         arbitrary_types_allowed = True
@@ -68,6 +67,7 @@ class User(BaseModel):
 
 class UserInDB(User):
     hashed_password: str
+    cards: Optional[list] = []
 
 
 class Card(BaseModel):
@@ -77,6 +77,17 @@ class Card(BaseModel):
     title: Optional[str] = None
     creator: Optional[PyObjectId] = None
     blocks: Optional[list] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str
+        }
+
+
+class CardInUser(BaseModel):
+    id: PyObjectId = Field(alias="_id")
+    bookmarked: Optional[bool] = False
 
     class Config:
         arbitrary_types_allowed = True
@@ -197,7 +208,8 @@ async def register(user: User, password: str):
     if hasattr(user, 'id'):
         delattr(user, 'id')
     user_dict = user.dict(by_alias=True)
-    user_dict.update({'hashed_password': get_password_hash(password)})
+    user_dict.update(
+        {'hashed_password': get_password_hash(password), 'cards': []})
     inserted_id = users_coll.insert(user_dict)
     user.id = inserted_id
     return user
@@ -208,25 +220,36 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
-@app.get("/users/me/cards/")
+@app.put("/users/me/avatar/")
+async def change_users_me_avatar(avatar_url: str, current_user: User = Depends(get_current_active_user)):
+    return users_coll.update({"username": current_user.username}, {'$set': {'avatar_url': avatar_url}})
+
+
+@app.get("/users/me/cards/", response_model=List[CardInUser])
 async def read_own_cards(current_user: User = Depends(get_current_active_user)):
     user = users_coll.find_one(
         {"username": current_user.username}, {"cards": 1})
-    cards = []
-    for card in user['cards']:
-        card["_id"] = str(card["_id"])
-        cards.append(card)
-    return cards
+    return user['cards']
 
 
-@app.post("/users/me/cards/{cid}")
-async def collect_card(current_user: User = Depends(get_current_active_user), cid: str = Path(..., title="The ID of the card to collect")):
+@app.post("/users/me/cards/")
+async def collect_card(card_in_user: CardInUser, current_user: User = Depends(get_current_active_user)):
     # users_coll.update({"username": current_user.username},{$set:{"":}})
-    if users_coll.find_one({"username": current_user.username, "cards._id": ObjectId(cid)}):
+    if users_coll.find_one({"username": current_user.username, "cards._id": card_in_user.dict(by_alias=True)["_id"]}):
         raise HTTPException(status_code=400, detail="Already collected")
     else:
         return users_coll.update({"username": current_user.username}, {
-            '$addToSet': {"cards": {"_id": ObjectId(cid), "bookmarked": False}}})
+            '$addToSet': {"cards": card_in_user.dict(by_alias=True)}})
+
+
+@app.put("/users/me/cards/")
+async def edit_card_in_user_me(card_in_user: CardInUser, current_user: User = Depends(get_current_active_user)):
+    input_dict = card_in_user.dict(by_alias=True)
+    prev_dict = users_coll.find_one({"username": current_user.username},
+                                    {"cards": {'$elemMatch': {'_id': input_dict["_id"]}}})["cards"][0]
+    prev_dict.update(input_dict)
+    return users_coll.update({"username": current_user.username, "cards._id": input_dict["_id"]}, {
+        '$set': {"cards.$": prev_dict}})
 
 
 @app.delete("/users/me/cards/{cid}")
