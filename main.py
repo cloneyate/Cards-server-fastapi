@@ -195,12 +195,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return result
 
 
-@app.get("/users/")
+@app.get("/users/", response_model=List[User])
 async def list_users():
     users = []
     for user in users_coll.find():
         users.append(User(**user))
-        return {'users': users}
+    return users
 
 
 @app.post("/users/")
@@ -258,7 +258,7 @@ async def drop_a_card(current_user: User = Depends(get_current_active_user), cid
         '$pull': {"cards": {"_id": ObjectId(cid)}}})
 
 
-@app.get("/cards/")
+@app.get("/cards/", response_model=List[Card])
 async def get_cards():
     cards = []
     for card in cards_coll.find():
