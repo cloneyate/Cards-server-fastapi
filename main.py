@@ -229,7 +229,7 @@ async def change_users_me_avatar(avatar_url: str, current_user: User = Depends(g
 async def read_own_cards(current_user: User = Depends(get_current_active_user)):
     user = users_coll.find_one(
         {"username": current_user.username}, {"cards": 1})
-    return user['cards']
+    return user['cards'][::-1]
 
 
 @app.post("/users/me/cards/")
