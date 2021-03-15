@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # to get a string like this run:
 # openssl rand -hex 32
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+SECRET_KEY = "ca4057d3f1be4d8aa0904ac06cfcb2a423788f8452f545ba81a29ac5aaa38114"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
@@ -107,6 +107,10 @@ origins = [
     "https://localhost.tiangolo.com",
     "http://localhost",
     "http://localhost:8080",
+    "http://callet.tk",
+    "https://callet.tk",
+    "http://www.callet.tk",
+    "https://www.callet.tk"
 ]
 
 app.add_middleware(
